@@ -74,7 +74,7 @@ template <WorkflowErrorModel Model> class Runner
         {
             return failure(native.error().code, std::move(native.error().message));
         }
-        return result_type{std::move(*native)};
+        return result_type{*native};
     }
 
   private:
