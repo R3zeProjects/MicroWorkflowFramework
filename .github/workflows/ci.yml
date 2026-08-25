@@ -1,0 +1,181 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux GCC
+            os: ubuntu-latest
+            cmake_args: -DCMAKE_CXX_COMPILER=g++
+            cxxflags: ''
+          - name: Linux Clang
+            os: ubuntu-latest
+            cmake_args: -DCMAKE_CXX_COMPILER=clang++
+            cxxflags: -stdlib=libc++ -fexperimental-library
+          - name: Windows MSVC
+            os: windows-latest
+            cmake_args: ''
+            cxxflags: ''
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Clang standard library
+        if: matrix.name == 'Linux Clang'
+        run: >-
+          bash .github/scripts/install-apt-packages.sh
+          clang libc++-dev libc++abi-dev
+      - name: Configure
+        shell: bash
+        env:
+          CXXFLAGS: ${{ matrix.cxxflags }}
+          LDFLAGS: ${{ matrix.cxxflags }}
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          ${{ matrix.cmake_args }}
+      - name: Build
+        run: cmake --build build --config Release --parallel 2
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  sanitizers:
+    name: Linux ASan + UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install toolchain
+        run: bash .github/scripts/install-apt-packages.sh ninja-build
+      - name: Configure
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_COMPILER=g++
+          -DBUILD_TESTING=ON
+          -DMWF_BUILD_EXAMPLES=OFF
+          -DMWF_ENABLE_SANITIZERS=ON
+      - name: Build and test
+        run: cmake --build build --parallel 2 && ctest --test-dir build --output-on-failure
+
+  thread-sanitizer:
+    name: Linux ThreadSanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_COMPILER=g++
+          -DBUILD_TESTING=ON
+          -DMWF_BUILD_EXAMPLES=OFF
+          -DMWF_ENABLE_THREAD_SANITIZER=ON
+      - name: Build and test
+        run: cmake --build build --parallel 2 && ctest --test-dir build --output-on-failure
+
+  static-analysis:
+    name: Linux clang-tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install analysis toolchain
+        run: >-
+          bash .github/scripts/install-apt-packages.sh
+          clang clang-tidy ninja-build libc++-dev libc++abi-dev
+      - name: Configure
+        env:
+          CXXFLAGS: -stdlib=libc++ -fexperimental-library
+          LDFLAGS: -stdlib=libc++ -fexperimental-library
+        run: >-
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_COMPILER=clang++
+          -DCMAKE_CXX_CLANG_TIDY=clang-tidy
+          -DBUILD_TESTING=ON
+          -DMWF_BUILD_EXAMPLES=OFF
+      - name: Analyze
+        run: cmake --build build --parallel 2
+
+  installed-package:
+    name: Installed package consumer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure and install MWF
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+          cmake --build build --parallel 2
+          cmake --install build --prefix "$PWD/install"
+      - name: Install MCF dependency
+        run: |
+          cmake -S build/_deps/vosp_contracts-src -B contracts -DBUILD_TESTING=OFF
+          cmake --install contracts --prefix "$PWD/install"
+      - name: Consume installed package
+        run: |
+          cmake -S tests/package_consumer -B consumer \
+            -DCMAKE_PREFIX_PATH="$PWD/install"
+          cmake --build consumer --parallel 2
+          ./consumer/mwf_package_consumer
+
+  mef-integration:
+    name: Direct MEF integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DMWF_BUILD_EXAMPLES=OFF
+          -DMWF_BUILD_MEF_INTEGRATION=ON
+      - name: Build and test
+        run: cmake --build build --parallel 2 && ctest --test-dir build --output-on-failure
+
+  benchmark-smoke:
+    name: Release benchmark smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure and build
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_TESTING=OFF -DMWF_BUILD_EXAMPLES=OFF -DMWF_BUILD_BENCHMARKS=ON
+          cmake --build build --parallel 2
+      - name: Run benchmark
+        run: ./build/MicroWorkflowFrameworkBenchmark 100 | tee benchmark.csv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mwf-benchmark-${{ github.sha }}
+          path: benchmark.csv
+
+  translation-parity:
+    if: github.ref == 'refs/heads/main-ru'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Verify main-ru is documentation-only
+        shell: bash
+        run: |
+          git fetch origin main
+          git diff --exit-code origin/main HEAD -- . ':(exclude,glob)**/*.md'
+          git ls-tree -r --name-only origin/main | grep -E '\.md$' | sort > main-md.txt
+          git ls-tree -r --name-only HEAD | grep -E '\.md$' | sort > ru-md.txt
+          diff -u main-md.txt ru-md.txt
