@@ -54,6 +54,7 @@ target_link_libraries(my_service PRIVATE vosp::workflow)
 | `BUILD_TESTING` | Значение CTest | Runtime-, header- и compile-fail тесты. |
 | `MWF_BUILD_EXAMPLES` | `ON` | Собрать базовый исполняемый пример. |
 | `MWF_BUILD_BENCHMARKS` | `OFF` | Собрать опциональный бенчмарк процессов. |
+| `MWF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS` | `OFF` | Собрать сравнение с Boost.Process и libuv, если доступны оба пакета. |
 | `MWF_BUILD_MEF_INTEGRATION` | `OFF` | Собрать прямую интеграцию с закреплённой ревизией MEF. |
 | `MWF_ENABLE_SANITIZERS` | `OFF` | Включить ASan и UBSan там, где они поддерживаются. |
 | `MWF_ENABLE_THREAD_SANITIZER` | `OFF` | Включить TSan в отдельной сборке. |

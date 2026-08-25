@@ -1,64 +1,66 @@
-# Framework comparison
+# Сравнение фреймворков
 
-MWF overlaps with process libraries and sandbox runtimes, but it does not replace either
-category completely. This comparison separates process orchestration, resource supervision,
-and adversarial isolation so unlike products are not ranked by one misleading number.
+MWF пересекается с процессными библиотеками и sandbox-runtime, но не заменяет полностью ни
+одну из этих категорий. Сравнение разделяет оркестрацию процессов, контроль ресурсов и
+защиту от враждебного кода, чтобы разные продукты не оценивались одним вводящим в
+заблуждение числом.
 
-## Capability matrix
+## Матрица возможностей
 
-| Capability | MWF 0.1.1 | Boost.Process 2.0 | libuv 1.52 | Sandbox2 | OCI runtime |
+| Возможность | MWF 0.1.1 | Boost.Process 2.0 | libuv 1.52 | Sandbox2 | OCI runtime |
 | --- | --- | --- | --- | --- | --- |
-| Primary role | Bounded process workflows | General C++ process API | Event-loop process and I/O API | Linux syscall/namespace sandbox | Container lifecycle specification |
-| Windows and POSIX | Yes | Yes | Yes | No, Linux | Runtime-dependent |
-| Typed non-throwing domain result | MCF `Result<T>` | Error-code and throwing APIs | Integer error codes/callbacks | Status-oriented API | Runtime protocol |
-| Cancellation/deadline | `std::stop_token` + wall deadline | Asio cancellation/timers | Event-loop callbacks and kill | Monitor policy | Runtime lifecycle operations |
-| Memory/CPU/process-count envelope | Built in | Not its primary API | Not its primary API | Sandbox policy/resource mechanisms | cgroups and rlimits |
-| Process-tree cleanup | Job Object/process group | Platform process primitives | Process handle and signals | Sandbox monitor | Container/cgroup lifecycle |
-| Environment and stdio routing | Not yet | Built in | Built in | Sandbox-specific | Built in to container configuration |
-| Syscall/filesystem/network security boundary | No | No | No | Linux seccomp and namespaces | Runtime-dependent namespaces, mounts and policy |
-| External runtime required | No | No | No | Yes, sandbox infrastructure | Yes |
+| Основная роль | Ограниченные процессные рабочие процессы | Универсальный процессный API C++ | Процессный и I/O API на event loop | Linux-песочница системных вызовов и пространств имён | Спецификация жизненного цикла контейнера |
+| Windows и POSIX | Да | Да | Да | Нет, только Linux | Зависит от runtime |
+| Типизированный небросающий результат домена | MCF `Result<T>` | API с кодами ошибок и исключениями | Целочисленные коды ошибок и callbacks | API на основе status | Протокол runtime |
+| Отмена/deadline | `std::stop_token` + deadline времени выполнения | Отмена/таймеры Asio | Callbacks event loop и kill | Политика монитора | Операции жизненного цикла runtime |
+| Контур памяти/CPU/числа процессов | Встроен | Не является основным API | Не является основным API | Механизмы политики и ресурсов песочницы | cgroups и rlimits |
+| Очистка дерева процессов | Job Object/группа процессов | Платформенные примитивы процессов | Handle процесса и сигналы | Монитор песочницы | Жизненный цикл контейнера/cgroup |
+| Маршрутизация окружения и stdio | Пока нет | Встроена | Встроена | Зависит от песочницы | Встроена в конфигурацию контейнера |
+| Граница безопасности системных вызовов/файловой системы/сети | Нет | Нет | Нет | Linux seccomp и пространства имён | Зависимые от runtime пространства имён, mounts и политики |
+| Требуется внешний runtime | Нет | Нет | Нет | Да, инфраструктура песочницы | Да |
 
-Boost.Process 2.0 is fully Asio-based, uses `pidfd_open` where available, supports UTF-8,
-and closes non-whitelisted POSIX descriptors by default according to its
-[official design notes](https://www.boost.org/doc/libs/latest/libs/process/doc/html/index.html#boost_process.design).
-It is the stronger choice when asynchronous pipes and broad process composition are the
-main requirement.
+Согласно
+[официальным заметкам о проектировании](https://www.boost.org/doc/libs/latest/libs/process/doc/html/index.html#boost_process.design),
+Boost.Process 2.0 полностью основан на Asio, использует `pidfd_open` там, где он доступен,
+поддерживает UTF-8 и по умолчанию закрывает все POSIX-дескрипторы вне allowlist. Это более
+сильный выбор, когда основными требованиями являются асинхронные pipes и широкая композиция
+процессов.
 
-libuv exposes process launch through `uv_spawn`, environment and working-directory fields,
-stdio routing, exit callbacks, and signal-like termination through its
-[process API](https://docs.libuv.org/en/v1.x/process.html). It is the stronger choice inside
-an existing libuv event loop.
+libuv предоставляет запуск через `uv_spawn`, поля окружения и рабочего каталога,
+маршрутизацию stdio, callbacks завершения и похожее на сигналы завершение через свой
+[процессный API](https://docs.libuv.org/en/v1.x/process.html). Это более сильный выбор внутри
+существующего event loop libuv.
 
-Sandbox2 implements Linux seccomp policy and namespace-oriented isolation through its
-[policy layer](https://github.com/google/sandboxed-api/blob/main/sandboxed_api/sandbox2/policy.h).
-OCI runtimes add a substantially larger container boundary; the
-[OCI Linux configuration](https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md)
-defines cgroups for memory, CPU, PIDs, I/O and other resources.
+Sandbox2 реализует политику Linux seccomp и изоляцию на основе пространств имён через свой
+[слой политик](https://github.com/google/sandboxed-api/blob/main/sandboxed_api/sandbox2/policy.h).
+OCI runtime добавляет существенно более широкую контейнерную границу;
+[конфигурация OCI Linux](https://github.com/opencontainers/runtime-spec/blob/main/config-linux.md)
+определяет cgroups для памяти, CPU, PIDs, I/O и других ресурсов.
 
-MWF is strongest when an application needs a small C++23 API, replaceable MCF error models,
-synchronous cancellation, bounded ordered workflows, cross-platform resource controls, and
-deterministic process-tree cleanup without adopting an event loop or container runtime.
+MWF наиболее силён, когда приложению нужны небольшой API C++23, заменяемые модели ошибок
+MCF, синхронная отмена, ограниченные упорядоченные рабочие процессы, кроссплатформенное
+управление ресурсами и детерминированная очистка дерева процессов без внедрения event loop
+или контейнерного runtime.
 
-## Performance comparison
+## Сравнение производительности
 
-The same-machine benchmark in [BENCHMARKS.md](BENCHMARKS.md) compares only equivalent
-synchronous launch-and-wait work against Boost.Process and libuv. Sandbox2 and OCI runtimes
-are intentionally excluded: namespace, policy, filesystem, and container setup provide a
-different security boundary and therefore a different workload.
+Бенчмарк на одной машине в [BENCHMARKS.md](BENCHMARKS.md) сравнивает с Boost.Process и
+libuv только эквивалентную синхронную работу запуска и ожидания. Sandbox2 и OCI runtime
+намеренно исключены: настройка пространств имён, политик, файловой системы и контейнера
+предоставляет другую границу безопасности и поэтому является другой нагрузкой.
 
-The measured Windows medians place MWF in the same launch-throughput band as Boost.Process
-and libuv. The medians ranged from 24.67 to 31.92 launches/s, while individual rounds varied
-far more widely and even reversed the order of MWF's supervised and launch-only modes. The
-defensible conclusion is parity under dominant operating-system launch noise, not a
-universal lead for any library.
+Измеренные медианы Windows помещают MWF в тот же диапазон пропускной способности запуска,
+что Boost.Process и libuv. Медианы находились между 24.67 и 31.92 запусков/с, а отдельные
+раунды различались намного сильнее и даже меняли порядок контролируемого режима MWF и
+режима только запуска. Обоснованный вывод — паритет при преобладающем шуме запуска
+операционной системы, а не универсальное лидерство какой-либо библиотеки.
 
-## Missing capabilities and roadmap
+## Недостающие возможности и план развития
 
-- Add explicit environment and stdio policies without changing the owning `ProcessSpec`
-  model.
-- Add an asynchronous execution surface only with an explicit scheduler and allocation
-  model; do not hide a thread per process.
-- Add cgroup v2, namespaces, seccomp, and AppContainer as separate capability-bearing
-  backends before claiming hostile-code isolation.
-- Preserve the launch-only fast path for callers that explicitly opt out of descendant and
-  pre-exec controls.
+- Добавить явные политики окружения и stdio без изменения владеющей модели `ProcessSpec`.
+- Добавлять асинхронную поверхность выполнения только с явной моделью scheduler и
+  аллокаций; не скрывать по одному потоку на процесс.
+- Добавить cgroup v2, пространства имён, seccomp и AppContainer как отдельные backend с
+  заявляемыми возможностями до утверждения об изоляции враждебного кода.
+- Сохранить быстрый путь только запуска для вызывающих сторон, которые явно отказываются от
+  управления потомками и контроля перед exec.
