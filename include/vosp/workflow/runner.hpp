@@ -69,6 +69,17 @@ template <WorkflowErrorModel Model> class Runner
                            "resource limits must be greater than zero");
         }
 
+        const auto available = capabilities();
+        if ((limits.memory_bytes && !available.memory_limit) ||
+            (limits.cpu_time && !available.cpu_time_limit) ||
+            (limits.wall_time && !available.wall_time_limit) ||
+            (limits.process_count && !available.process_count_limit) ||
+            (limits.terminate_descendants && !available.process_tree_termination))
+        {
+            return failure(error_code::unsupported_limit,
+                           "requested resource control is unavailable on this platform");
+        }
+
         auto native = detail::run_process(specification, limits, stop_token);
         if (!native)
         {

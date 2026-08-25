@@ -18,7 +18,7 @@ Application ErrorModel (MCF contract)
                  |
        detail::run_process seam
           /                 \
- Windows Job Objects     POSIX fork/exec
+ Windows Job Objects     POSIX fork/exec or posix_spawn
                          setrlimit/process group
 ```
 

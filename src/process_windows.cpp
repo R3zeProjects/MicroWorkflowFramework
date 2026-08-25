@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <expected>
 #include <limits>
+#include <optional>
 #include <stop_token>
 #include <string>
 #include <string_view>
@@ -56,7 +57,8 @@ class Handle
     HANDLE value_{};
 };
 
-[[nodiscard]] NativeError windows_error(std::uint32_t code, std::string_view operation)
+[[nodiscard]] NativeError windows_error(std::uint32_t code, std::string_view operation,
+                                        std::uint32_t framework_code = error_code::platform_failure)
 {
     LPWSTR buffer = nullptr;
     const DWORD length = FormatMessageW(
@@ -78,7 +80,7 @@ class Handle
         }
         LocalFree(buffer);
     }
-    return NativeError{error_code::platform_failure, std::move(message)};
+    return NativeError{framework_code, std::move(message)};
 }
 
 [[nodiscard]] std::expected<std::wstring, NativeError> utf8_to_wide(std::string_view text)
@@ -165,6 +167,23 @@ void terminate_owned_process(HANDLE job, HANDLE process, bool descendants,
         static_cast<void>(TerminateProcess(process, exit_code));
     }
 }
+
+[[nodiscard]] DWORD wait_timeout(std::chrono::steady_clock::time_point started,
+                                 const std::optional<std::chrono::milliseconds> &wall_time)
+{
+    if (!wall_time)
+    {
+        return INFINITE;
+    }
+    const auto remaining = started + *wall_time - std::chrono::steady_clock::now();
+    if (remaining <= std::chrono::steady_clock::duration::zero())
+    {
+        return 0;
+    }
+    const auto milliseconds = std::chrono::ceil<std::chrono::milliseconds>(remaining).count();
+    return static_cast<DWORD>(
+        std::min<std::int64_t>(milliseconds, static_cast<std::int64_t>(INFINITE) - 1));
+}
 } // namespace
 
 Capabilities platform_capabilities() noexcept
@@ -191,10 +210,16 @@ std::expected<ProcessResult, NativeError> run_process(const ProcessSpec &specifi
     std::vector<wchar_t> mutable_command(command->begin(), command->end());
     mutable_command.push_back(L'\0');
 
-    Handle job{CreateJobObjectW(nullptr, nullptr)};
-    if (!job)
+    const bool requires_job = limits.terminate_descendants || limits.memory_bytes ||
+                              limits.cpu_time || limits.process_count;
+    Handle job;
+    if (requires_job)
     {
-        return std::unexpected{windows_error(GetLastError(), "CreateJobObjectW")};
+        job = Handle{CreateJobObjectW(nullptr, nullptr)};
+        if (!job)
+        {
+            return std::unexpected{windows_error(GetLastError(), "CreateJobObjectW")};
+        }
     }
 
     JOBOBJECT_EXTENDED_LIMIT_INFORMATION job_limits{};
@@ -229,8 +254,8 @@ std::expected<ProcessResult, NativeError> run_process(const ProcessSpec &specifi
         job_limits.BasicLimitInformation.ActiveProcessLimit = *limits.process_count;
         job_limits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
     }
-    if (!SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &job_limits,
-                                 sizeof(job_limits)))
+    if (requires_job && !SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation,
+                                                 &job_limits, sizeof(job_limits)))
     {
         return std::unexpected{windows_error(GetLastError(), "SetInformationJobObject")};
     }
@@ -240,23 +265,24 @@ std::expected<ProcessResult, NativeError> run_process(const ProcessSpec &specifi
     PROCESS_INFORMATION information{};
     const wchar_t *working_directory =
         specification.working_directory ? specification.working_directory->c_str() : nullptr;
+    const DWORD creation_flags = CREATE_UNICODE_ENVIRONMENT | (requires_job ? CREATE_SUSPENDED : 0);
     if (!CreateProcessW(specification.executable.c_str(), mutable_command.data(), nullptr, nullptr,
-                        FALSE, CREATE_SUSPENDED | CREATE_UNICODE_ENVIRONMENT, nullptr,
-                        working_directory, &startup, &information))
+                        FALSE, creation_flags, nullptr, working_directory, &startup, &information))
     {
-        return std::unexpected{windows_error(GetLastError(), "CreateProcessW")};
+        return std::unexpected{
+            windows_error(GetLastError(), "CreateProcessW", error_code::launch_failed)};
     }
 
     Handle process{information.hProcess};
     Handle thread{information.hThread};
-    if (!AssignProcessToJobObject(job.get(), process.get()))
+    if (requires_job && !AssignProcessToJobObject(job.get(), process.get()))
     {
         const DWORD error = GetLastError();
         terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
         WaitForSingleObject(process.get(), INFINITE);
         return std::unexpected{windows_error(error, "AssignProcessToJobObject")};
     }
-    if (ResumeThread(thread.get()) == static_cast<DWORD>(-1))
+    if (requires_job && ResumeThread(thread.get()) == static_cast<DWORD>(-1))
     {
         const DWORD error = GetLastError();
         terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
@@ -264,10 +290,35 @@ std::expected<ProcessResult, NativeError> run_process(const ProcessSpec &specifi
         return std::unexpected{windows_error(error, "ResumeThread")};
     }
 
+    Handle cancellation_event;
+    if (stop_token.stop_possible())
+    {
+        cancellation_event = Handle{CreateEventW(nullptr, TRUE, FALSE, nullptr)};
+        if (!cancellation_event)
+        {
+            const DWORD error = GetLastError();
+            terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
+            WaitForSingleObject(process.get(), INFINITE);
+            return std::unexpected{windows_error(error, "CreateEventW")};
+        }
+    }
+    const auto request_cancellation = [event = cancellation_event.get()]() noexcept
+    {
+        if (event)
+        {
+            static_cast<void>(SetEvent(event));
+        }
+    };
+    std::stop_callback cancellation{stop_token, request_cancellation};
+
     StopReason reason = StopReason::exited;
     while (true)
     {
-        const DWORD wait_result = WaitForSingleObject(process.get(), 5);
+        const DWORD timeout = wait_timeout(started, limits.wall_time);
+        const HANDLE handles[]{process.get(), cancellation_event.get()};
+        const DWORD wait_result = cancellation_event
+                                      ? WaitForMultipleObjects(2, handles, FALSE, timeout)
+                                      : WaitForSingleObject(process.get(), timeout);
         if (wait_result == WAIT_OBJECT_0)
         {
             break;
@@ -277,22 +328,31 @@ std::expected<ProcessResult, NativeError> run_process(const ProcessSpec &specifi
             const DWORD error = GetLastError();
             terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
             WaitForSingleObject(process.get(), INFINITE);
-            return std::unexpected{windows_error(error, "WaitForSingleObject")};
+            return std::unexpected{windows_error(error, "process wait")};
         }
-        if (stop_token.stop_requested())
+        if (cancellation_event && wait_result == WAIT_OBJECT_0 + 1)
         {
             reason = StopReason::cancelled;
             terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
             WaitForSingleObject(process.get(), INFINITE);
             break;
         }
-        if (limits.wall_time && clock::now() - started >= *limits.wall_time)
+        if (wait_result == WAIT_TIMEOUT && limits.wall_time &&
+            clock::now() - started >= *limits.wall_time)
         {
             reason = StopReason::timed_out;
             terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
             WaitForSingleObject(process.get(), INFINITE);
             break;
         }
+        if (wait_result == WAIT_TIMEOUT)
+        {
+            continue;
+        }
+        terminate_owned_process(job.get(), process.get(), limits.terminate_descendants, 1);
+        WaitForSingleObject(process.get(), INFINITE);
+        return std::unexpected{
+            NativeError{error_code::platform_failure, "process wait returned an invalid state"}};
     }
 
     DWORD exit_code = 1;

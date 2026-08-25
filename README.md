@@ -106,12 +106,14 @@ ctest --test-dir build -C Release --output-on-failure
 ожидает проверенный нулевой код завершения и измеряет полный цикл нативного процесса. Он
 не устанавливается вместе с пакетом.
 
-```text
-Machine: AMD Ryzen 7 PRO 1700X, 8 cores / 16 threads, 31.95 GiB RAM
-OS/toolchain: Windows 10 Pro, MSVC 19.51, Release
-Workload: 100 sequential native process round trips
-Result: 1.91971 s total, 52.0913 launches/s
-```
+On an Ubuntu 24.04 container using GCC 13.3 Release, seven rounds of 200 launches produced
+these medians on the same host and child executable:
+
+| Scenario | Median launches/s | Change from v0.1.0 |
+| --- | ---: | ---: |
+| v0.1.0 supervised baseline | 181.34 | Baseline |
+| v0.1.1 supervised | 205.35 | +13.2% |
+| v0.1.1 launch-only | 215.85 | +19.0% |
 
 Создание процесса выполняется операционной системой. Этот показатель является
 воспроизводимой базовой линией, а не утверждением, что MWF запускает процессы дешевле
