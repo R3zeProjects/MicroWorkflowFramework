@@ -1,0 +1,13 @@
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  -bugprone-exception-escape,
+  performance-*,
+  portability-*,
+  -portability-avoid-pragma-once,
+  modernize-use-override
+WarningsAsErrors: '*'
+HeaderFilterRegex: '^(.*[/\\])?(include|src|tests|examples)[/\\].*'
+CheckOptions:
+  bugprone-easily-swappable-parameters.MinimumLength: 4
