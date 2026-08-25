@@ -63,6 +63,20 @@ auto result = runner.run(process, limits, source.get_token());
 
 The call returns only after the owned process has terminated and been reaped.
 
+## Use the launch-only fast path
+
+```cpp
+vosp::ResourceLimits launch_only;
+launch_only.terminate_descendants = false;
+
+auto result = runner.run(process, launch_only);
+```
+
+This policy is appropriate only when the executable cannot create descendants that MWF
+must clean up. With no pre-exec resource controls or working-directory change, it permits a
+cheaper native launch path. Cancellation and wall deadlines still terminate and reap the
+direct child, but not independently running descendants.
+
 ## Build a bounded workflow
 
 ```cpp

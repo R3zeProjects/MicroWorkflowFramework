@@ -53,6 +53,7 @@ installed.
 | `BUILD_TESTING` | CTest default | Runtime, header, and compile-fail tests. |
 | `MWF_BUILD_EXAMPLES` | `ON` | Build the basic executable example. |
 | `MWF_BUILD_BENCHMARKS` | `OFF` | Build the opt-in process benchmark. |
+| `MWF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS` | `OFF` | Build the Boost.Process/libuv comparison when both packages are available. |
 | `MWF_BUILD_MEF_INTEGRATION` | `OFF` | Build direct integration with pinned MEF. |
 | `MWF_ENABLE_SANITIZERS` | `OFF` | Enable ASan and UBSan where supported. |
 | `MWF_ENABLE_THREAD_SANITIZER` | `OFF` | Enable TSan in a separate build. |

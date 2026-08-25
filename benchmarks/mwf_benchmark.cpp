@@ -8,6 +8,27 @@
 #include <iostream>
 #include <string_view>
 
+namespace
+{
+template <typename Launch>
+bool measure(std::string_view scenario, std::size_t iterations, Launch &&launch)
+{
+    const auto started = std::chrono::steady_clock::now();
+    for (std::size_t index = 0; index < iterations; ++index)
+    {
+        const auto result = launch();
+        if (!result || !result->succeeded())
+        {
+            return false;
+        }
+    }
+    const std::chrono::duration<double> elapsed = std::chrono::steady_clock::now() - started;
+    std::cout << scenario << ',' << iterations << ',' << elapsed.count() << ','
+              << static_cast<double>(iterations) / elapsed.count() << '\n';
+    return true;
+}
+} // namespace
+
 int main(int argc, char **argv)
 {
     if (argc > 1 && std::string_view{argv[1]} == "--child")
@@ -19,19 +40,14 @@ int main(int argc, char **argv)
     const vosp::ProcessSpec child{executable, {"--child"}, std::nullopt};
     vosp::ProcessRunner<TestErrorModel> runner;
 
-    const auto started = std::chrono::steady_clock::now();
-    std::size_t completed = 0;
-    for (std::size_t index = 0; index < iterations; ++index)
+    vosp::ResourceLimits launch_only;
+    launch_only.terminate_descendants = false;
+
+    std::cout << "scenario,iterations,seconds,launches_per_second\n";
+    if (!measure("supervised_process_round_trip", iterations, [&] { return runner.run(child); }) ||
+        !measure("launch_only_process_round_trip", iterations,
+                 [&] { return runner.run(child, launch_only); }))
     {
-        const auto result = runner.run(child);
-        if (!result || !result->succeeded())
-        {
-            return 1;
-        }
-        ++completed;
+        return 1;
     }
-    const auto elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - started);
-    std::cout << "scenario,iterations,seconds,launches_per_second\n"
-              << "native_process_round_trip," << completed << ',' << elapsed.count() << ','
-              << static_cast<double>(completed) / elapsed.count() << '\n';
 }

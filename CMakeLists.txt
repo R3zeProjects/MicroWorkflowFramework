@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-project(MicroWorkflowFramework VERSION 0.1.0 LANGUAGES CXX)
+project(MicroWorkflowFramework VERSION 0.1.1 LANGUAGES CXX)
 set(MICRO_WORKFLOW_FRAMEWORK_PRERELEASE "beta")
 
 include(CTest)
@@ -10,6 +10,8 @@ find_package(Threads REQUIRED)
 
 option(MWF_BUILD_EXAMPLES "Build MWF examples" ON)
 option(MWF_BUILD_BENCHMARKS "Build opt-in MWF benchmarks" OFF)
+option(MWF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS
+    "Build opt-in benchmarks against Boost.Process and libuv" OFF)
 option(MWF_BUILD_MEF_INTEGRATION "Build direct integration with pinned MEF" OFF)
 option(MWF_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(MWF_ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer" OFF)
@@ -115,6 +117,14 @@ if(BUILD_TESTING)
     mwf_enable_sanitizers(MicroWorkflowFrameworkTests)
     add_test(NAME MicroWorkflowFramework.Tests COMMAND MicroWorkflowFrameworkTests)
 
+    add_executable(MicroWorkflowFrameworkConcurrencyStress
+        tests/concurrency_stress.cpp)
+    target_link_libraries(MicroWorkflowFrameworkConcurrencyStress
+        PRIVATE MicroWorkflowFramework)
+    mwf_enable_sanitizers(MicroWorkflowFrameworkConcurrencyStress)
+    add_test(NAME MicroWorkflowFramework.ConcurrencyStress
+        COMMAND MicroWorkflowFrameworkConcurrencyStress)
+
     add_executable(MicroWorkflowFrameworkInvalidModel EXCLUDE_FROM_ALL
         tests/compile_fail/invalid_model.cpp)
     target_link_libraries(MicroWorkflowFrameworkInvalidModel
@@ -138,6 +148,21 @@ endif()
 if(MWF_BUILD_BENCHMARKS)
     add_executable(MicroWorkflowFrameworkBenchmark benchmarks/mwf_benchmark.cpp)
     target_link_libraries(MicroWorkflowFrameworkBenchmark PRIVATE MicroWorkflowFramework)
+endif()
+
+if(MWF_BUILD_EXTERNAL_COMPARISON_BENCHMARKS)
+    find_package(Boost 1.90 CONFIG REQUIRED COMPONENTS process)
+    find_package(libuv CONFIG REQUIRED)
+    add_executable(MicroWorkflowFrameworkExternalBenchmark
+        benchmarks/external_comparison.cpp)
+    target_link_libraries(MicroWorkflowFrameworkExternalBenchmark PRIVATE
+        MicroWorkflowFramework
+        Boost::process
+        $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>)
+    if(WIN32)
+        target_compile_definitions(MicroWorkflowFrameworkExternalBenchmark PRIVATE
+            _WIN32_WINNT=0x0A00)
+    endif()
 endif()
 
 if(MWF_BUILD_MEF_INTEGRATION)

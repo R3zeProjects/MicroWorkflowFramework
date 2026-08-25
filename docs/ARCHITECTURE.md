@@ -17,7 +17,7 @@ Application ErrorModel (MCF contract)
                  |
        detail::run_process seam
           /                 \
- Windows Job Objects     POSIX fork/exec
+ Windows Job Objects     POSIX fork/exec or posix_spawn
                          setrlimit/process group
 ```
 
@@ -52,9 +52,12 @@ Application ErrorModel (MCF contract)
 
 ## Portability decisions
 
-Windows uses suspended process creation so the child can be assigned to a configured Job
-before execution resumes. POSIX uses a close-on-exec error pipe so pre-exec and `execvp`
-failures are distinguishable from an application exit code.
+Windows uses suspended process creation when a configured Job is required and native wait
+objects for completion, cancellation, and deadlines. Launch-only execution skips Job setup.
+POSIX uses a close-on-exec error pipe so pre-exec and `execvp` failures are distinguishable
+from an application exit code. Launch-only execution with no working-directory or pre-exec
+resource setup uses `posix_spawnp`; supervised execution retains the `fork` path and its
+parent-death/process-group guarantees.
 
 The platform backends intentionally expose the same categories rather than pretending the
 semantics are identical. For example, Windows active-process limits are job-scoped while

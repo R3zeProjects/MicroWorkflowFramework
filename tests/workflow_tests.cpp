@@ -2,7 +2,6 @@
 
 #include "test_model.hpp"
 
-#include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <new>
@@ -14,6 +13,15 @@
 namespace
 {
 using namespace std::chrono_literals;
+
+#define CHECK(condition)                                                                           \
+    do                                                                                             \
+    {                                                                                              \
+        if (!(condition))                                                                          \
+        {                                                                                          \
+            return __LINE__;                                                                       \
+        }                                                                                          \
+    } while (false)
 
 int child_main(int argc, char **argv)
 {
@@ -67,28 +75,28 @@ int main(int argc, char **argv)
     vosp::ProcessRunner<TestErrorModel> runner;
 
     const auto success = runner.run(child(executable, "exit", "0"));
-    assert(success);
-    assert(success->succeeded());
+    CHECK(success);
+    CHECK(success->succeeded());
 
     const auto nonzero = runner.run(child(executable, "exit", "7"));
-    assert(nonzero);
-    assert(nonzero->reason == vosp::StopReason::exited);
-    assert(nonzero->exit_code == 7);
-    assert(!nonzero->succeeded());
+    CHECK(nonzero);
+    CHECK(nonzero->reason == vosp::StopReason::exited);
+    CHECK(nonzero->exit_code == 7);
+    CHECK(!nonzero->succeeded());
 
     vosp::ResourceLimits timeout_limits;
     timeout_limits.wall_time = 30ms;
     const auto timeout = runner.run(child(executable, "sleep", "500"), timeout_limits);
-    assert(timeout);
-    assert(timeout->reason == vosp::StopReason::timed_out);
+    CHECK(timeout);
+    CHECK(timeout->reason == vosp::StopReason::timed_out);
 
     vosp::ResourceLimits memory_limits;
     memory_limits.memory_bytes = 128ULL * 1024 * 1024;
     memory_limits.wall_time = 5s;
     const auto memory_limited =
         runner.run(child(executable, "allocate", "536870912"), memory_limits);
-    assert(memory_limited);
-    assert(!memory_limited->succeeded());
+    CHECK(memory_limited);
+    CHECK(!memory_limited->succeeded());
 
     std::stop_source source;
     std::jthread canceller{[&source]
@@ -97,24 +105,37 @@ int main(int argc, char **argv)
                                source.request_stop();
                            }};
     const auto cancelled = runner.run(child(executable, "sleep", "500"), {}, source.get_token());
-    assert(cancelled);
-    assert(cancelled->reason == vosp::StopReason::cancelled);
+    CHECK(cancelled);
+    CHECK(cancelled->reason == vosp::StopReason::cancelled);
 
     const auto invalid = runner.run({});
-    assert(!invalid);
-    assert(invalid.error().code() == vosp::workflow::error_code::invalid_specification);
+    CHECK(!invalid);
+    CHECK(invalid.error().code() == vosp::workflow::error_code::invalid_specification);
+
+    vosp::ResourceLimits invalid_limits;
+    invalid_limits.process_count = 0;
+    const auto invalid_limit = runner.run(child(executable, "exit", "0"), invalid_limits);
+    CHECK(!invalid_limit);
+    CHECK(invalid_limit.error().code() == vosp::workflow::error_code::invalid_specification);
+
+    const auto missing = runner.run({executable.parent_path() / "mwf-definitely-missing", {}, {}});
+    CHECK(!missing);
+    CHECK(missing.error().code() == vosp::workflow::error_code::launch_failed);
 
     vosp::ProcessWorkflow<TestErrorModel> workflow;
-    assert(workflow.add({"prepare", child(executable, "exit", "0"), {}}));
-    assert(workflow.add({"fail", child(executable, "exit", "9"), {}}));
-    assert(workflow.add({"skipped", child(executable, "exit", "0"), {}}));
-    assert(!workflow.add({"fail", child(executable, "exit", "0"), {}}));
+    CHECK(workflow.add({"prepare", child(executable, "exit", "0"), {}}));
+    CHECK(workflow.add({"fail", child(executable, "exit", "9"), {}}));
+    CHECK(workflow.add({"skipped", child(executable, "exit", "0"), {}}));
+    CHECK(!workflow.add({"fail", child(executable, "exit", "0"), {}}));
     const auto report = workflow.run();
-    assert(report);
-    assert(report->steps.size() == 2);
-    assert(!report->succeeded());
+    CHECK(report);
+    CHECK(report->steps.size() == 2);
+    CHECK(!report->succeeded());
+
+    vosp::ProcessWorkflow<TestErrorModel> empty_workflow{{.max_steps = 0}};
+    CHECK(!empty_workflow.add({"rejected", child(executable, "exit", "0"), {}}));
 
     const auto capabilities = vosp::ProcessRunner<TestErrorModel>::capabilities();
-    assert(capabilities.wall_time_limit);
-    assert(capabilities.cooperative_cancellation);
+    CHECK(capabilities.wall_time_limit);
+    CHECK(capabilities.cooperative_cancellation);
 }

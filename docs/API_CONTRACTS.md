@@ -14,8 +14,10 @@ The selected `Result<T>` must be constructible from the requested value and from
 - `ProcessSpec::executable` must not be empty.
 - Arguments and the optional working directory are owning values.
 - Arguments are UTF-8 at the public boundary; the Windows backend converts them to UTF-16.
-- The child inherits the parent environment in 0.1.0-beta.
+- The child inherits the parent environment in 0.1.1-beta.
 - A nonzero child exit is a successful launch result, not an MWF framework error.
+- Failure to create or execute the requested image uses `error_code::launch_failed`;
+  failures in native supervision setup use `error_code::platform_failure`.
 
 ## Resource limits
 
@@ -42,6 +44,8 @@ limit.
 - POSIX children are always reaped; Windows process, thread, and Job handles use RAII.
 - Closing a Windows Job with kill-on-close enabled terminates remaining descendants.
 - MWF does not detach processes or leave background worker threads.
+- Separate calls to one stateless `Runner` instance may execute concurrently. Each call owns
+  its native handles and process lifecycle.
 
 ## Workflow
 
@@ -56,7 +60,7 @@ limit.
 
 ## Security non-goals
 
-MWF 0.1.0-beta does not provide namespaces, containers, VM isolation, filesystem policy,
+MWF 0.1.1-beta does not provide namespaces, containers, VM isolation, filesystem policy,
 network policy, syscall filtering, credential dropping, secrets isolation, or protection
 from a malicious child. These controls require a privileged platform sandbox backend and
 must never be inferred from `ResourceLimits`.

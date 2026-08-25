@@ -8,12 +8,12 @@ process-count limits, process-tree cleanup, cooperative cancellation, and ordere
 execution. MWF uses [MicroContractsFramework](https://github.com/R3zeProjects/MicroContractsFramework)
 for replaceable error/result models and does not require MicroErrorFramework at runtime.
 
-Current release: **0.1.0-beta**.
+Current release: **0.1.1-beta**.
 
 ## What it provides
 
 - Owning `ProcessSpec`, `ResourceLimits`, and result values.
-- `Runner<ErrorModel>` for one isolated child process.
+- `Runner<ErrorModel>` for one managed child process.
 - `Workflow<ErrorModel>` for up to 1024 uniquely named ordered steps.
 - Fail-fast or continue-on-failure workflow policy.
 - `std::stop_token` cancellation and bounded wall-clock execution.
@@ -26,7 +26,7 @@ Current release: **0.1.0-beta**.
 
 ## Important isolation boundary
 
-MWF is a process resource-control framework, not a container runtime. Version 0.1.0-beta
+MWF is a process resource-control framework, not a container runtime. Version 0.1.1-beta
 does **not** create Linux namespaces, a private root filesystem, seccomp filters, virtual
 networks, Windows AppContainers, or a privilege boundary. Do not run hostile code under the
 assumption that MWF provides Docker-equivalent security isolation.
@@ -94,22 +94,25 @@ ctest --test-dir build -C Release --output-on-failure
 Without `MWF_CONTRACTS_SOURCE_DIR`, CMake first searches for `vosp_contracts 0.6` and then
 fetches the pinned compatible MCF revision when `MWF_FETCH_CONTRACTS=ON`.
 
-## Measured process-launch baseline
+## Measured process-launch performance
 
 The opt-in benchmark launches the benchmark executable as a child, waits for a verified
 zero exit, and reports complete native process round trips. It is not installed with the
 package.
 
-```text
-Machine: AMD Ryzen 7 PRO 1700X, 8 cores / 16 threads, 31.95 GiB RAM
-OS/toolchain: Windows 10 Pro, MSVC 19.51, Release
-Workload: 100 sequential native process round trips
-Result: 1.91971 s total, 52.0913 launches/s
-```
+On an Ubuntu 24.04 container using GCC 13.3 Release, seven rounds of 200 launches produced
+these medians on the same host and child executable:
+
+| Scenario | Median launches/s | Change from v0.1.0 |
+| --- | ---: | ---: |
+| v0.1.0 supervised baseline | 181.34 | Baseline |
+| v0.1.1 supervised | 205.35 | +13.2% |
+| v0.1.1 launch-only | 215.85 | +19.0% |
 
 Process creation is an operating-system operation; this number is a reproducible baseline,
 not a claim that MWF makes process startup cheaper than the underlying OS. See
-[benchmark methodology](docs/BENCHMARKS.md).
+[benchmark methodology](docs/BENCHMARKS.md) and the
+[framework comparison](docs/COMPARISON.md).
 
 ## Documentation
 
@@ -118,6 +121,7 @@ not a claim that MWF makes process startup cheaper than the underlying OS. See
 - [Installation](docs/INSTALLATION.md)
 - [Usage examples](docs/USAGE_EXAMPLES.md)
 - [Benchmark methodology](docs/BENCHMARKS.md)
+- [Comparison with process and sandbox frameworks](docs/COMPARISON.md)
 
 ## Repository layout
 
