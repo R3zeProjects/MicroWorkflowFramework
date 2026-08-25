@@ -1,11 +1,14 @@
-# Changelog
+# Журнал изменений
 
 ## 0.1.0-beta — 2026-08-25
 
-- Added typed single-process execution through `Runner<ErrorModel>`.
-- Added bounded sequential workflows with a hard limit of 1024 steps.
-- Added memory, CPU-time, wall-time, process-count, cancellation, and tree-cleanup controls.
-- Added Windows Job Object and POSIX `setrlimit` backends.
-- Added MCF error-model contracts, CMake package installation, examples, tests, CI, and an
-  opt-in process round-trip benchmark.
-- Documented the boundary between resource control and container-grade security isolation.
+- Добавлено типизированное выполнение одного процесса через `Runner<ErrorModel>`.
+- Добавлены ограниченные последовательные рабочие процессы с жёстким пределом в 1024
+  шага.
+- Добавлены ограничения памяти, процессорного времени, времени выполнения и числа
+  процессов, а также отмена и очистка дерева процессов.
+- Добавлены backend на основе Windows Job Object и POSIX `setrlimit`.
+- Добавлены контракты модели ошибок MCF, установка пакета CMake, примеры, тесты, CI и
+  опциональный бенчмарк полного цикла процесса.
+- Задокументирована граница между контролем ресурсов и безопасной изоляцией контейнерного
+  уровня.

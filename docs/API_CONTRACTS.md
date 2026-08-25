@@ -1,62 +1,71 @@
-# API contracts
+# Контракты API
 
-## Error model
+## Модель ошибок
 
-`Runner<Model>` and `Workflow<Model>` require an MCF-compatible owning error model. The
-model provides `Error`, `Result<T>`, `OperationResult`, and `make_error`. MWF never stores a
-reference to the model and does not require inheritance or a runtime adapter.
+`Runner<Model>` и `Workflow<Model>` требуют владеющую модель ошибок, совместимую с MCF.
+Модель предоставляет `Error`, `Result<T>`, `OperationResult` и `make_error`. MWF никогда
+не сохраняет ссылку на модель и не требует наследования или runtime-адаптера.
 
-The selected `Result<T>` must be constructible from the requested value and from
-`std::unexpected<Model::Error>` for both `ProcessResult` and `WorkflowReport`.
+Выбранный `Result<T>` должен создаваться из запрошенного значения и из
+`std::unexpected<Model::Error>` как для `ProcessResult`, так и для `WorkflowReport`.
 
-## Process specification
+## Спецификация процесса
 
-- `ProcessSpec::executable` must not be empty.
-- Arguments and the optional working directory are owning values.
-- Arguments are UTF-8 at the public boundary; the Windows backend converts them to UTF-16.
-- The child inherits the parent environment in 0.1.0-beta.
-- A nonzero child exit is a successful launch result, not an MWF framework error.
+- `ProcessSpec::executable` не должен быть пустым.
+- Аргументы и необязательный рабочий каталог являются владеющими значениями.
+- На публичной границе аргументы представлены в UTF-8; Windows backend преобразует их в
+  UTF-16.
+- В версии 0.1.0-beta дочерний процесс наследует окружение родителя.
+- Ненулевой код дочернего процесса является успешным результатом запуска, а не ошибкой
+  фреймворка MWF.
 
-## Resource limits
+## Ограничения ресурсов
 
-All supplied numeric limits must be greater than zero. A failure to install a requested
-native limit fails the launch instead of silently running without that limit.
+Все заданные числовые ограничения должны быть больше нуля. Если запрошенное нативное
+ограничение установить не удалось, запуск завершается ошибкой вместо незаметного запуска
+без этого ограничения.
 
-| Limit | Contract |
+| Ограничение | Контракт |
 | --- | --- |
-| `memory_bytes` | Bounds one process on Windows and the address space on POSIX. |
-| `cpu_time` | Bounds per-process user CPU time; it is not a throughput quota. |
-| `wall_time` | Parent observes a monotonic deadline and terminates the process tree. |
-| `process_count` | Uses a Windows Job limit or POSIX `RLIMIT_NPROC`; POSIX scope is account-dependent. |
-| `terminate_descendants` | Places the child in a killable job/process group when true. |
+| `memory_bytes` | Ограничивает один процесс в Windows и адресное пространство в POSIX. |
+| `cpu_time` | Ограничивает пользовательское процессорное время одного процесса; это не квота пропускной способности. |
+| `wall_time` | Родитель отслеживает монотонный deadline и завершает дерево процессов. |
+| `process_count` | Использует лимит Windows Job или POSIX `RLIMIT_NPROC`; область действия POSIX зависит от учётной записи. |
+| `terminate_descendants` | При значении true помещает дочерний процесс в завершаемую Job или группу процессов. |
 
-`Capabilities` reports whether the compiled backend implements each category. It does not
-elevate process privileges or prove that the host configuration permits every requested
-limit.
+`Capabilities` сообщает, реализует ли скомпилированный backend соответствующую категорию.
+Он не повышает привилегии процесса и не доказывает, что конфигурация хоста разрешает
+каждое запрошенное ограничение.
 
-## Lifecycle and cancellation
+## Жизненный цикл и отмена
 
-- `Runner::run()` is synchronous and owns the child until it has been reaped.
-- `std::stop_token` cancellation is cooperative for the caller and forceful for the child.
-- Timeout and cancellation wait for process termination before returning.
-- POSIX children are always reaped; Windows process, thread, and Job handles use RAII.
-- Closing a Windows Job with kill-on-close enabled terminates remaining descendants.
-- MWF does not detach processes or leave background worker threads.
+- `Runner::run()` выполняется синхронно и владеет дочерним процессом, пока тот не будет
+  собран.
+- Отмена через `std::stop_token` является совместной для вызывающей стороны и
+  принудительной для дочернего процесса.
+- При превышении времени и отмене функция ожидает завершения процесса перед возвратом.
+- POSIX-процессы всегда собираются; handles процесса, потока и Job в Windows управляются
+  через RAII.
+- Закрытие Windows Job с включённым kill-on-close завершает оставшиеся дочерние процессы.
+- MWF не отсоединяет процессы и не оставляет фоновые worker-потоки.
 
-## Workflow
+## Рабочий процесс
 
-- Steps execute in insertion order.
-- Names must be nonempty and unique within one workflow.
-- Executables must be nonempty.
-- `max_steps` is clamped to the hard limit of 1024.
-- `add()` returns `false` for invalid, duplicate, or over-capacity steps.
-- Fail-fast mode stops after the first nonzero, signaled, timed-out, or cancelled result.
-- A framework error such as launch failure is returned through the configured error model.
-- `Workflow` is not internally synchronized; one owner configures and executes an instance.
+- Шаги выполняются в порядке добавления.
+- Имена должны быть непустыми и уникальными внутри одного рабочего процесса.
+- Пути к исполняемым файлам должны быть непустыми.
+- `max_steps` ограничивается жёстким пределом 1024.
+- `add()` возвращает `false` для недопустимого, дублирующего или превышающего ёмкость
+  шага.
+- Режим fail-fast останавливается после первого ненулевого, завершённого сигналом,
+  превысившего время или отменённого результата.
+- Ошибка фреймворка, например ошибка запуска, возвращается через выбранную модель ошибок.
+- `Workflow` не синхронизируется внутри; один владелец настраивает и выполняет экземпляр.
 
-## Security non-goals
+## Что не является целью безопасности
 
-MWF 0.1.0-beta does not provide namespaces, containers, VM isolation, filesystem policy,
-network policy, syscall filtering, credential dropping, secrets isolation, or protection
-from a malicious child. These controls require a privileged platform sandbox backend and
-must never be inferred from `ResourceLimits`.
+MWF 0.1.0-beta не предоставляет пространства имён, контейнеры, изоляцию виртуальной
+машины, политику файловой системы, сетевую политику, фильтрацию системных вызовов,
+понижение привилегий, изоляцию секретов или защиту от вредоносного дочернего процесса. Эти
+меры требуют привилегированного платформенного backend песочницы и никогда не должны
+подразумеваться из наличия `ResourceLimits`.

@@ -1,12 +1,13 @@
-# Architecture
+# Архитектура
 
-## Scope and goal
+## Область ответственности и цель
 
-MWF owns bounded process execution and ordered process workflows. It separates portable
-workflow policy from native process creation so applications can use one C++23 API without
-scattering Win32 or POSIX branches through domain code.
+MWF отвечает за ограниченное выполнение процессов и последовательные процессные рабочие
+процессы. Он отделяет переносимую политику рабочего процесса от нативного создания
+процессов, поэтому приложение использует единый API C++23 без разбросанных по доменному
+коду ветвей Win32 и POSIX.
 
-## Components
+## Компоненты
 
 ```text
 Application ErrorModel (MCF contract)
@@ -21,56 +22,62 @@ Application ErrorModel (MCF contract)
                          setrlimit/process group
 ```
 
-- `types.hpp` owns stable data values and contains no native handles.
-- `Runner<Model>` validates inputs, invokes one backend, and converts native failures into
-  the selected error model.
-- `Workflow<Model>` owns at most 1024 steps and applies ordering/fail-fast policy.
-- `detail/backend.hpp` is the only link between templates and platform translation units.
-- `process_windows.cpp` owns Win32 Job, process, and thread handles through RAII.
-- `process_posix.cpp` installs limits before `exec`, reports setup failure over a close-on-
-  exec pipe, and reaps every child.
+- `types.hpp` владеет стабильными значениями данных и не содержит нативных handles.
+- `Runner<Model>` проверяет входные данные, вызывает один backend и преобразует нативные
+  ошибки в выбранную модель ошибок.
+- `Workflow<Model>` владеет не более чем 1024 шагами и применяет политику порядка и
+  fail-fast.
+- `detail/backend.hpp` является единственной связью между шаблонами и платформенными
+  единицами трансляции.
+- `process_windows.cpp` управляет Win32 Job, процессом и thread handles через RAII.
+- `process_posix.cpp` устанавливает ограничения перед `exec`, передаёт ошибку подготовки
+  через закрываемый при exec pipe и собирает каждый дочерний процесс.
 
-## Execution flow
+## Поток выполнения
 
-1. The caller creates owning process and resource values.
-2. `Runner` rejects empty executables and zero-valued limits.
-3. The backend creates the process in a controllable state.
-4. Native resource controls are installed before application work begins.
-5. The parent observes completion, wall time, and the stop token.
-6. Timeout or cancellation terminates the owned process tree.
-7. The backend reaps the process and returns an owning `ProcessResult`.
-8. `Workflow` records the result and applies its failure policy.
+1. Вызывающая сторона создаёт владеющие значения процесса и ресурсов.
+2. `Runner` отклоняет пустой исполняемый файл и ограничения с нулевыми значениями.
+3. Backend создаёт процесс в контролируемом состоянии.
+4. Нативные ограничения ресурсов устанавливаются до начала работы пользовательского кода.
+5. Родитель отслеживает завершение, время выполнения и stop token.
+6. Превышение времени или отмена завершает принадлежащее runner дерево процессов.
+7. Backend собирает процесс и возвращает владеющий `ProcessResult`.
+8. `Workflow` сохраняет результат и применяет свою политику ошибок.
 
-## Invariants
+## Инварианты
 
-- A returned launched process has already terminated and been reaped.
-- Native handles do not cross the public API.
-- Requested limits are never silently ignored.
-- No detached thread or process is created by the framework.
-- Workflow storage is bounded and preserves insertion order.
-- Recoverable framework failures cross the API through the selected MCF error model.
+- Возвращённый запущенный процесс уже завершён и собран.
+- Нативные handles не пересекают публичную границу API.
+- Запрошенные ограничения никогда не игнорируются незаметно.
+- Фреймворк не создаёт отсоединённые потоки или процессы.
+- Хранилище рабочего процесса ограничено и сохраняет порядок добавления.
+- Восстановимые ошибки фреймворка проходят через выбранную модель ошибок MCF.
 
-## Portability decisions
+## Решения по переносимости
 
-Windows uses suspended process creation so the child can be assigned to a configured Job
-before execution resumes. POSIX uses a close-on-exec error pipe so pre-exec and `execvp`
-failures are distinguishable from an application exit code.
+В Windows используется создание приостановленного процесса, чтобы до возобновления
+выполнения назначить дочерний процесс настроенной Job. В POSIX используется pipe с флагом
+close-on-exec, позволяющий отличить ошибки до exec и ошибки `execvp` от кода завершения
+приложения.
 
-The platform backends intentionally expose the same categories rather than pretending the
-semantics are identical. For example, Windows active-process limits are job-scoped while
-`RLIMIT_NPROC` is commonly user-scoped.
+Платформенные backend намеренно предоставляют одинаковые категории, не выдавая их
+семантику за полностью идентичную. Например, лимит активных процессов Windows действует
+на Job, тогда как `RLIMIT_NPROC` обычно действует на пользователя.
 
-## Extension points
+## Точки расширения
 
-Future backends may add Linux cgroup v2, namespaces, seccomp, Windows AppContainer, output
-capture, explicit environment maps, dependency graphs, parallel scheduling, persistence,
-telemetry, and resilience policies. Those features should extend the narrow backend or
-compose with MPF/MTF/MRF; they must not introduce adapter objects into application code.
+Будущие backend могут добавить Linux cgroup v2, пространства имён, seccomp, Windows
+AppContainer, захват вывода, явные карты окружения, графы зависимостей, параллельное
+планирование, persistence, телеметрию и политики отказоустойчивости. Эти возможности
+должны расширять узкий backend или напрямую компоноваться с MPF/MTF/MRF; они не должны
+добавлять объекты-адаптеры в код приложения.
 
-## Risks and open questions
+## Риски и открытые вопросы
 
-- POSIX operations between `fork` and `exec` must remain async-signal-safe.
-- Host policy can reject limits even when the API is compiled for that platform.
-- Process-count behavior differs materially across operating systems.
-- Secure hostile-code isolation requires a privileged sandbox design and dedicated threat
-  model before it can be claimed.
+- Операции POSIX между `fork` и `exec` должны оставаться async-signal-safe.
+- Политика хоста может отклонить ограничения, даже если API скомпилирован для этой
+  платформы.
+- Семантика ограничения числа процессов существенно различается между операционными
+  системами.
+- Безопасная изоляция враждебного кода требует привилегированной песочницы и отдельной
+  модели угроз, прежде чем такую гарантию можно будет заявить.

@@ -1,11 +1,11 @@
-# Benchmark methodology
+# Методика бенчмарка
 
-The opt-in benchmark measures complete process round trips through the public
-`ProcessRunner` API. Each iteration creates the benchmark executable as a child, executes a
-minimal child path, waits for exit code zero, closes native resources, and validates each
-result inside the measured round trip.
+Опциональный бенчмарк измеряет полный цикл процесса через публичный API `ProcessRunner`.
+Каждая итерация создаёт исполняемый файл бенчмарка как дочерний процесс, выполняет
+минимальный дочерний путь, ожидает нулевой код завершения, закрывает нативные ресурсы и
+проверяет результат внутри измеряемого полного цикла.
 
-## Build and run
+## Сборка и запуск
 
 ```bash
 cmake -S . -B build-bench -DCMAKE_BUILD_TYPE=Release \
@@ -14,29 +14,31 @@ cmake --build build-bench --config Release --parallel 2
 ./build-bench/MicroWorkflowFrameworkBenchmark 100
 ```
 
-On multi-config Windows generators, run
+При использовании многоконфигурационного генератора Windows запускайте
 `build-bench/Release/MicroWorkflowFrameworkBenchmark.exe`.
 
-## Recorded baseline
+## Зафиксированная базовая линия
 
-Date: 2026-08-25.
+Дата: 2026-08-25.
 
-| Field | Value |
+| Поле | Значение |
 | --- | --- |
-| CPU | AMD Ryzen 7 PRO 1700X, 8 cores / 16 logical processors |
-| Memory | 31.95 GiB |
-| OS | Windows 10 Pro |
-| Compiler | MSVC 19.51, Release |
-| Iterations | 100 sequential launches |
-| Total time | 1.91971 s |
-| Throughput | 52.0913 launches/s |
+| Процессор | AMD Ryzen 7 PRO 1700X, 8 ядер / 16 логических процессоров |
+| Память | 31.95 GiB |
+| Операционная система | Windows 10 Pro |
+| Компилятор | MSVC 19.51, Release |
+| Итерации | 100 последовательных запусков |
+| Общее время | 1.91971 s |
+| Пропускная способность | 52.0913 запусков/с |
 
-## Interpretation
+## Интерпретация
 
-The benchmark includes native process creation and teardown, which dominate the cost. It
-does not compare MWF with an in-process thread pool, because those mechanisms provide
-different failure and resource boundaries. CI runs a shorter smoke workload and uploads the
-raw CSV-style output; published comparisons must use the same executable, host, limits,
-iteration count, and delivered work.
+Бенчмарк включает создание и завершение нативного процесса, которые формируют основную
+часть стоимости. Он не сравнивает MWF с внутрипроцессным пулом потоков, поскольку эти
+механизмы предоставляют разные границы отказов и ресурсов. CI выполняет короткую
+smoke-нагрузку и загружает исходный CSV-подобный результат; публикуемые сравнения должны
+использовать одинаковый исполняемый файл, хост, ограничения, число итераций и объём
+выполненной работы.
 
-Benchmarks are development evidence and are never installed with the package.
+Бенчмарки являются подтверждением для разработки и никогда не устанавливаются вместе с
+пакетом.

@@ -1,8 +1,8 @@
-# Usage examples
+# Примеры использования
 
-## Error model
+## Модель ошибок
 
-MWF accepts any direct implementation satisfying the MCF contract:
+MWF принимает любую прямую реализацию, удовлетворяющую контракту MCF:
 
 ```cpp
 struct AppModel {
@@ -17,10 +17,10 @@ struct AppModel {
 };
 ```
 
-The concrete model may come from MEF. MWF does not need an adapter because it consumes the
-contracted types directly.
+Конкретная модель может предоставляться MEF. MWF не требует адаптера, поскольку напрямую
+использует типы, соответствующие контракту.
 
-## Run one bounded process
+## Запуск одного ограниченного процесса
 
 ```cpp
 vosp::ProcessRunner<AppModel> runner;
@@ -47,7 +47,7 @@ if (!result) {
 }
 ```
 
-## Cancel a running process
+## Отмена выполняющегося процесса
 
 ```cpp
 std::stop_source source;
@@ -61,9 +61,9 @@ std::jthread watchdog([&source] {
 auto result = runner.run(process, limits, source.get_token());
 ```
 
-The call returns only after the owned process has terminated and been reaped.
+Вызов возвращается только после завершения и сбора принадлежащего runner процесса.
 
-## Build a bounded workflow
+## Создание ограниченного рабочего процесса
 
 ```cpp
 vosp::WorkflowPolicy policy{
@@ -79,10 +79,10 @@ workflow.add({"publish", publish_spec, publisher_limits});
 auto report = workflow.run(stop_token);
 ```
 
-Names are unique, execution order is stable, and capacity is hard-bounded at 1024 even if a
-larger policy value is supplied.
+Имена уникальны, порядок выполнения стабилен, а ёмкость жёстко ограничена 1024 шагами,
+даже если в политике задано большее значение.
 
-## Continue after child failure
+## Продолжение после ошибки дочернего процесса
 
 ```cpp
 vosp::ProcessWorkflow<AppModel> workflow({
@@ -91,10 +91,11 @@ vosp::ProcessWorkflow<AppModel> workflow({
 });
 ```
 
-Framework launch errors still stop execution because no `ProcessResult` exists for that
-step. Nonzero exits, signals, timeouts, and cancellations are recorded as process results.
+Ошибки запуска фреймворка по-прежнему останавливают выполнение, поскольку для такого шага
+не существует `ProcessResult`. Ненулевые коды, сигналы, превышения времени и отмены
+записываются как результаты процессов.
 
-## Inspect platform support
+## Проверка поддержки платформы
 
 ```cpp
 const auto support = vosp::capabilities();
@@ -103,5 +104,5 @@ if (!support.process_count_limit) {
 }
 ```
 
-Capability discovery reports implementation availability. Native policy can still reject a
-specific launch, which is returned as a typed framework error.
+Проверка возможностей сообщает о наличии реализации. Нативная политика всё ещё может
+отклонить конкретный запуск, что будет возвращено как типизированная ошибка фреймворка.
