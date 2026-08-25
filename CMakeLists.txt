@@ -16,6 +16,10 @@ option(MWF_ENABLE_THREAD_SANITIZER "Enable ThreadSanitizer" OFF)
 option(MWF_FETCH_CONTRACTS "Fetch pinned MCF contracts when not installed" ON)
 set(MWF_CONTRACTS_SOURCE_DIR "" CACHE PATH "Optional MicroContractsFramework source tree")
 
+# Embedded dependencies provide contracts only; their examples must not inherit this
+# project's sanitizer or clang-tidy configuration.
+set(MCF_BUILD_EXAMPLES OFF CACHE BOOL "Build embedded MCF examples" FORCE)
+
 if(MWF_ENABLE_SANITIZERS AND MWF_ENABLE_THREAD_SANITIZER)
     message(FATAL_ERROR "ASan/UBSan and ThreadSanitizer require separate builds")
 endif()
