@@ -48,7 +48,7 @@ if(NOT TARGET vosp::contracts)
             include(FetchContent)
             FetchContent_Declare(vosp_contracts
                 GIT_REPOSITORY https://github.com/R3zeProjects/MicroContractsFramework.git
-                GIT_TAG e69892633f0d863424a5b76c9730c2456691e564
+                GIT_TAG 39996b3b2f2f20860e8e396c12165c096b924999
                 GIT_SHALLOW FALSE)
             set(_mwf_saved_build_testing "${BUILD_TESTING}")
             set(BUILD_TESTING OFF)
@@ -173,7 +173,7 @@ if(MWF_BUILD_MEF_INTEGRATION)
     set(BUILD_EXTERNAL_COMPARISON_BENCHMARKS OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(mwf_mef
         GIT_REPOSITORY https://github.com/R3zeProjects/MicroErrorFramework.git
-        GIT_TAG 8c718fc49c65c82d7451434194b024b8e0197dec
+        GIT_TAG 7692a00b333dfc7549893ec5bb0e91b8db655307
         GIT_SHALLOW FALSE)
     set(_mwf_saved_build_testing "${BUILD_TESTING}")
     set(BUILD_TESTING OFF)

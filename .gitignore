@@ -1,4 +1,5 @@
 /build*/
+/audit-*/
 /.cache/
 /.idea/
 /.vscode/

@@ -18,6 +18,12 @@ cmake --build build-bench --config Release --parallel 2
 On multi-config Windows generators, run
 `build-bench/Release/MicroWorkflowFrameworkBenchmark.exe`.
 
+The 2026-08-26 Clang 22.1.6 Release verification used seven independent
+processes with 100 launches per scenario. Median complete round trips were
+51.96 launches/s in supervised mode and 51.45 launches/s in launch-only mode.
+Raw samples are stored in
+[`current-native-raw-2026-08-26.csv`](../benchmark-results/current-native-raw-2026-08-26.csv).
+
 ## Linux v0.1.0 to v0.1.1 A/B
 
 Date: 2026-08-25.
@@ -49,15 +55,17 @@ zero. Seven rotated rounds of 50 launches produced these medians:
 
 | Scenario | Median launches/s |
 | --- | ---: |
-| libuv | 31.92 |
-| MWF supervised | 31.57 |
-| MWF launch-only | 27.78 |
-| Boost.Process 2.0 | 24.67 |
+| libuv | 28.31 |
+| MWF supervised | 28.14 |
+| MWF launch-only | 26.58 |
+| Boost.Process 2.0 | 26.82 |
 
 Machine: AMD Ryzen 7 PRO 1700X, Windows 10 Pro, MSVC 19.51 Release. The spread between
 rounds was large because executable startup, endpoint inspection, and scheduler activity
 dominate framework overhead. Treat the values as same-machine evidence, not universal
-rankings.
+rankings. These 2026-08-26 values come from seven rotated rounds of 50 launches
+per scenario; every exit code was validated. Raw rows are stored in
+[`external-process-raw-2026-08-26.csv`](../benchmark-results/external-process-raw-2026-08-26.csv).
 
 Build this optional target after providing Boost.Process and libuv CMake packages:
 

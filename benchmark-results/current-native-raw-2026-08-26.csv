@@ -1,0 +1,15 @@
+sample,scenario,iterations,seconds,launches_per_second
+1,supervised_process_round_trip,100,1.92459,51.9591
+1,launch_only_process_round_trip,100,1.94366,51.4494
+2,supervised_process_round_trip,100,1.95027,51.2749
+2,launch_only_process_round_trip,100,2.05302,48.7087
+3,supervised_process_round_trip,100,1.9088,52.3888
+3,launch_only_process_round_trip,100,1.88577,53.0288
+4,supervised_process_round_trip,100,1.79792,55.6199
+4,launch_only_process_round_trip,100,1.88378,53.0849
+5,supervised_process_round_trip,100,1.83223,54.5782
+5,launch_only_process_round_trip,100,1.87076,53.4543
+6,supervised_process_round_trip,100,1.92674,51.9012
+6,launch_only_process_round_trip,100,2.05328,48.7025
+7,supervised_process_round_trip,100,2.00171,49.9573
+7,launch_only_process_round_trip,100,2.03757,49.0781
