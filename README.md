@@ -134,6 +134,17 @@ benchmarks/             Opt-in process round-trip benchmark
 docs/                   Contracts, architecture, setup, and operations
 ```
 
+## Ecosystem role and language branches
+
+MWF owns bounded child-process execution, cancellation, resource limits, and
+dependency-aware workflows behind Windows and POSIX backends. MRF may supervise
+those operations without becoming an MWF dependency. The
+[ecosystem compatibility gate](https://github.com/R3zeProjects/MicroContractsFramework/blob/main/docs/ECOSYSTEM_COMPATIBILITY.md)
+checks successful and non-zero process completion through installed packages.
+
+`main` is the canonical English branch. `main-ru` contains identical source and
+Russian Markdown documentation; Actions verifies that only documentation differs.
+
 ## License
 
 MIT License. See [LICENSE](LICENSE).
